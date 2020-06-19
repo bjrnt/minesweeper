@@ -1,0 +1,33 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  font-size: 13vh;
+}
+
+.row {
+  display: flex;
+}
+
+.cell {
+  width: 17vh;
+  height: 17vh;
+  background-color: #555;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background-color: #aaa;
+}
+
+.revealed {
+  background-color: #999;
+  cursor: auto;
+}
+
+.revealed:hover {
+  background-color: #999;
+}
