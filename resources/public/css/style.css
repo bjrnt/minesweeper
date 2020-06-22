@@ -1,7 +1,21 @@
 .grid {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   font-size: 13vh;
+  position: relative;
+}
+
+.overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
 }
 
 .row {
@@ -17,6 +31,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  border: solid 1px rgba(0,0,0,0.3);
 }
 
 .cell:hover {

@@ -18,10 +18,15 @@
        (> width x -1)))
 
 (defn win? [grid]
-  (every? :flagged (filter :bomb grid)))
+  (let [cells (map second grid)]
+    (and (every? :flagged (filter :bomb cells))
+         (every? :revealed (filter #(not (:bomb %)) cells)))))
 
 (defn lose? [grid]
-  (some :revealed (filter :bomb grid)))
+  (some :revealed (filter :bomb (map second grid))))
+
+(defn active? [grid]
+  (not (or (win? grid) (lose? grid))))
 
 (def empty-cell
   {:revealed false
