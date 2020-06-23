@@ -1,9 +1,19 @@
 (ns ^:figwheel-hooks minesweeper.core
   (:require [reagent.core :as r]
             [reagent.dom]
-            [minesweeper.game :as game]))
+            [minesweeper.game :as game]
+            [clojure.string :as str]))
 
-(defonce grid (r/atom (game/reset)))
+(def default-difficulty :test)
+
+(def difficulties {:test '(5 5 2)
+                   :beginner '(9 9 10)
+                   :intermediate '(16 16 40)
+                   :expert '(30 16 99)})
+
+(defonce grid (r/atom (apply game/reset (default-difficulty difficulties))))
+
+(defonce selected-difficulty (r/atom default-difficulty))
 
 (defn cell-content [c]
   (cond
@@ -23,7 +33,7 @@
   (when-not (:revealed c) (swap! grid game/toggle-flagged pt)))
 
 (defn reset-game []
-  (reset! grid (game/reset)))
+  (reset! grid (apply game/reset (@selected-difficulty difficulties))))
 
 (defn grid-cell [[pt c]]
   ^{:key pt}
@@ -41,21 +51,34 @@
   [:div.overlay [:span (if (game/win? @grid) "🥳" "😭")]])
 
 (defn grid-ui [grid]
-  (let [rows (partition-all game/width grid)]
+  (let [rows (partition-all (game/grid-width grid) grid)]
     [:div.grid
      (map grid-row rows)
      (when-not (game/active? grid) [endgame-overlay])
      ]))
 
+(defn difficulty-selector []
+  [:select
+   {:on-change #(reset! selected-difficulty (keyword (.-value (.-target %))))
+    :value     @selected-difficulty}
+   (map (fn [difficulty]
+          ^{:key difficulty}
+          [:option
+           {:value difficulty}
+           (str/capitalize (name difficulty) )]
+          ) (keys difficulties))
+   ])
+
 (defn controls []
   [:div
+   [difficulty-selector]
    [:button.reset
     {:on-click reset-game}
     "Reset"]])
 
 (defn simple-example []
   [:div
-   [grid-ui (into (sorted-map) @grid)]
+   [grid-ui @grid]
    [controls]])
 
 (defn ^:after-load run []
@@ -64,7 +87,9 @@
 (defonce init-block (run))
 
 ;; TODOs:
-;; 1. Add proper game loop with win/lose
-;; 2. Add difficulties
+;; [OK] 1. Add proper game loop with win/lose
+;; [OK] 2. Add difficulties
 ;; 3. Improve UI (bombs remaining, clock)
 ;; 4. Add space functionality
+;; 5. Add distribution settings (dev/prod)
+;; 6. Improve design
