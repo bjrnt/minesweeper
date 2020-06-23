@@ -1,7 +1,19 @@
+.game {
+  display: inline-block;
+  font-size: 1.5rem;
+}
+
+.game-stats {
+    display: flex;
+    justify-content: space-between;
+}
+
+.controls {
+}
+
 .grid {
   display: inline-flex;
   flex-direction: column;
-  font-size: 2.5rem;
   position: relative;
 }
 
