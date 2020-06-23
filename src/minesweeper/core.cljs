@@ -92,8 +92,7 @@
     "Reset"]])
 
 (defn bombs-remaining []
-  [:div.bombs-remaining
-   (str "💣" (count (filter #(and (:bomb %) (not (:flagged %))) (vals @grid))))])
+  [:div.bombs-remaining (str "💣" (game/remaining-flags-count @grid))])
 
 (defn game-stats []
   [:div.game-stats

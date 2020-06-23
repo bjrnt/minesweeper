@@ -87,6 +87,14 @@
 (defn toggle-flagged [grid pt]
   (update-in grid [pt :flagged] not))
 
+(defn bomb-count [grid]
+  (count (filter :bomb (vals grid))))
+
+(defn remaining-flags-count [grid]
+  (let [total (bomb-count grid)
+        placed (count (filter :flagged (vals grid)))]
+    (- total placed)))
+
 (defn reset [width height bomb-count]
   (let [pts (create-pts width height)]
     (add-bombs (create-grid pts) (create-bomb-pts pts bomb-count))))
