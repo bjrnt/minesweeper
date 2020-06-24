@@ -23,7 +23,7 @@
 
 (defonce selected-cell (r/atom nil))
 
-(defonce grid (r/atom (apply game/reset (default-difficulty difficulties))))
+(defonce grid (r/atom (apply game/action-reset (default-difficulty difficulties))))
 
 (defonce playtime (r/atom 0))
 (defonce timer-token (r/atom (js/setInterval #(swap! playtime inc) 1000)))
@@ -40,10 +40,10 @@
   (fn [e] (do (.preventDefault e) (f e))))
 
 (defn reveal-cell [[pt c]]
-  (when-not (:flagged c) (swap! grid game/reveal pt)))
+  (when-not (:flagged c) (swap! grid game/action-reveal pt)))
 
 (defn toggle-flag-cell [[pt c]]
-  (when-not (:revealed c) (swap! grid game/toggle-flagged pt)))
+  (when-not (:revealed c) (swap! grid game/action-toggle-flagged pt)))
 
 (defn reset-timer []
   (js/clearInterval @timer-token)
@@ -55,10 +55,10 @@
 
 (defn reset-game []
   (reset-timer)
-  (reset! grid (apply game/reset (@selected-difficulty difficulties))))
+  (reset! grid (apply game/action-reset (@selected-difficulty difficulties))))
 
 (defn context-action []
-  (when (some? @selected-cell) (swap! grid game/context-action @selected-cell)))
+  (when (some? @selected-cell) (swap! grid game/action-from-context @selected-cell)))
 
 (def space-keycode 32)
 (defn when-space [f]
@@ -89,7 +89,7 @@
   [:div.overlay [:span (if (game/win? @grid) "🥳" "😭")]])
 
 (defn grid-ui [grid]
-  (let [rows (partition-all (game/grid-width grid) grid)]
+  (let [rows (partition-all (game/width grid) grid)]
     [:div.grid
      {:on-mouse-leave mouse-leave}
      (map grid-row rows)
@@ -118,7 +118,7 @@
     "Reset"]])
 
 (defn bombs-remaining []
-  [:div.bombs-remaining (str "💣" (game/remaining-flags-count @grid))])
+  [:div.bombs-remaining (str "💣" (game/flags-remaining @grid))])
 
 (defn game-stats []
   [:div.game-stats
