@@ -80,12 +80,30 @@
     (grid)))
 
 (defn reveal [grid pt]
+  "Start revealing from the given point. May reveal only the given point, or more if its count is zero."
   (if (auto-continue? (get grid pt))
     (reveal-from grid pt)
     (set-revealed grid pt)))
 
+(defn reveal-neighbors [grid pt]
+  "Reveal all neighbors of the given point."
+  (let [neighbors (neighbor-pts grid pt)
+        non-flagged (filter #(not (:flagged (get grid %))) neighbors)]
+    (reduce reveal grid non-flagged)))
+
 (defn toggle-flagged [grid pt]
   (update-in grid [pt :flagged] not))
+
+(defn flagged-count? [grid pt]
+  (let [pts (neighbor-pts grid pt)
+        expected (:count (get grid pt))]
+    (= expected (count (filter :flagged (map (partial get grid) pts))))))
+
+(defn context-action [grid pt]
+  "Take action depending on which point was selected. If it is an unrevealed tile, toggle it's flagged state. If it is a revealed tile, reveal all its neighbors."
+  (if (:revealed (get grid pt))
+    (if (flagged-count? grid pt) (reveal-neighbors grid pt) grid)
+    (toggle-flagged grid pt)))
 
 (defn bomb-count [grid]
   (count (filter :bomb (vals grid))))
@@ -93,7 +111,7 @@
 (defn remaining-flags-count [grid]
   (let [total (bomb-count grid)
         placed (count (filter :flagged (vals grid)))]
-    (- total placed)))
+    (max 0 (- total placed))))
 
 (defn reset [width height bomb-count]
   (let [pts (create-pts width height)]

@@ -4,6 +4,15 @@
             [minesweeper.game :as game]
             [clojure.string :as str]))
 
+(def count-colors {1 "rgb(0,0,254)"
+                   2 "rgb(0,128,0)"
+                   3 "rgb(254,0,0)"
+                   4 "rgb(0,0,128)"
+                   5 "rgb(128,0,0)"
+                   6 "rgb(0,128,128)"
+                   7 "rgb(0,0,0)"
+                   8 "rgb(128,128,128)"})
+
 (def difficulties {:test         '(5 5 2)
                    :beginner     '(9 9 10)
                    :intermediate '(16 16 40)
@@ -11,6 +20,8 @@
 (def default-difficulty :test)
 
 (defonce selected-difficulty (r/atom default-difficulty))
+
+(defonce selected-cell (r/atom nil))
 
 (defonce grid (r/atom (apply game/reset (default-difficulty difficulties))))
 
@@ -22,7 +33,7 @@
     (:flagged c) "\uD83D\uDEA9"
     (:bomb c) "\uD83D\uDCA3"
     (= (:count c) 0) " "
-    :else (:count c)))
+    :else [:span {:style {:color (count-colors (:count c))}} (:count c)]))
 
 (defn prevent-default [f]
   "Wraps `f` in a handler to prevent the default event action."
@@ -46,12 +57,26 @@
   (reset-timer)
   (reset! grid (apply game/reset (@selected-difficulty difficulties))))
 
+(defn context-action []
+  (when (some? @selected-cell) (swap! grid game/context-action @selected-cell)))
+
+(def space-keycode 32)
+(defn when-space [f]
+  (fn [e] (when (= space-keycode (.-keyCode e)) (do (.preventDefault e) (f)))))
+
+(defn mouse-over [pt]
+  (fn [] (reset! selected-cell pt)))
+
+(defn mouse-leave [e]
+  (reset! selected-cell nil))
+
 (defn grid-cell [[pt c]]
   ^{:key pt}
   [:div.cell
    {:class           (if (:revealed c) "revealed" "concealed")
     :on-click        #(reveal-cell [pt c])
-    :on-context-menu (prevent-default #(toggle-flag-cell [pt c]))}
+    :on-context-menu (prevent-default #(toggle-flag-cell [pt c]))
+    :on-mouse-over   (mouse-over pt)}
    (if (or (:revealed c) (:flagged c)) (cell-content c))])
 
 (defn grid-row [[[row-num _] :as cells]]
@@ -66,6 +91,7 @@
 (defn grid-ui [grid]
   (let [rows (partition-all (game/grid-width grid) grid)]
     [:div.grid
+     {:on-mouse-leave mouse-leave}
      (map grid-row rows)
      (when-not (game/active? grid) [endgame-overlay])
      ]))
@@ -99,21 +125,25 @@
    [timer]
    [bombs-remaining]])
 
-(defn simple-example []
+(defn minesweeper []
   [:div.game
    [game-stats]
    [grid-ui @grid]
    [controls]])
 
 (defn ^:after-load run []
-  (reagent.dom/render [simple-example] (js/document.getElementById "app")))
+  (reagent.dom/render [minesweeper] (js/document.getElementById "app")))
 
-(defonce init-block (run))
+(defonce init-block
+         (do
+           (.addEventListener js/document "keydown" (when-space context-action))
+           (run)))
 
 ;; TODOs:
 ;; [OK] 1. Add proper game loop with win/lose
 ;; [OK] 2. Add difficulties
 ;; [OK] 3. Improve UI (bombs remaining, clock)
-;; 4. Add space functionality
-;; 5. Add distribution settings (dev/prod)
-;; 6. Improve design
+;; [OK] 4. Add space functionality
+;; 5. Fix first-click bomb
+;; 6. Add distribution settings (dev/prod)
+;; 7. Improve design

@@ -1,3 +1,8 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  overflow:hidden;
+}
+
 .game {
   display: inline-block;
   font-size: 1.5rem;
@@ -39,7 +44,7 @@
   width: 3rem;
   height: 3rem;
   font-size: 2.5rem;
-  background-color: #555;
+  background-color: #777;
   color: black;
   display: flex;
   align-items: center;
@@ -49,14 +54,10 @@
 }
 
 .cell:hover {
-  background-color: #aaa;
+    filter: brightness(110%);
 }
 
 .revealed {
-  background-color: #999;
+  background-color: #bbb;
   cursor: auto;
-}
-
-.revealed:hover {
-  background-color: #999;
 }
