@@ -23,27 +23,29 @@
 
 (defonce selected-cell (r/atom nil))
 
-(defonce grid (r/atom (apply game/action-reset (default-difficulty difficulties))))
+(defonce state (r/atom (apply game/new-game (default-difficulty difficulties))))
 
+;; TODO: move into game state
 (defonce playtime (r/atom 0))
 (defonce timer-token (r/atom (js/setInterval #(swap! playtime inc) 1000)))
 
-(defn cell-content [c]
+;; TODO: refactor
+(defn cell-content [{:keys [flagged bombs counts]} pt]
   (cond
-    (:flagged c) "\uD83D\uDEA9"
-    (:bomb c) "\uD83D\uDCA3"
-    (= (:count c) 0) " "
-    :else [:span {:style {:color (count-colors (:count c))}} (:count c)]))
+    (flagged pt) "\uD83D\uDEA9"
+    (bombs pt) "\uD83D\uDCA3"
+    (= (get counts pt) 0) " "
+    :else [:span {:style {:color (count-colors (get counts pt))}} (get counts pt)]))
 
 (defn prevent-default [f]
   "Wraps `f` in a handler to prevent the default event action."
   (fn [e] (do (.preventDefault e) (f e))))
 
-(defn reveal-cell [[pt c]]
-  (when-not (:flagged c) (swap! grid game/action-reveal pt)))
+(defn reveal-cell [pt]
+  (swap! state game/take-action :reveal pt))
 
-(defn toggle-flag-cell [[pt c]]
-  (when-not (:revealed c) (swap! grid game/action-toggle-flagged pt)))
+(defn toggle-flag-cell [pt]
+  (swap! state game/take-action :flag pt))
 
 (defn reset-timer []
   (js/clearInterval @timer-token)
@@ -55,10 +57,10 @@
 
 (defn reset-game []
   (reset-timer)
-  (reset! grid (apply game/action-reset (@selected-difficulty difficulties))))
+  (reset! state (apply game/new-game (@selected-difficulty difficulties))))
 
 (defn context-action []
-  (when (some? @selected-cell) (swap! grid game/action-from-context @selected-cell)))
+  (when (some? @selected-cell) (swap! state game/take-action :context @selected-cell)))
 
 (def space-keycode 32)
 (defn when-space [f]
@@ -70,30 +72,32 @@
 (defn mouse-leave [e]
   (reset! selected-cell nil))
 
-(defn grid-cell [[pt c]]
+(defn grid-cell [{:keys [revealed flagged] :as state} pt]
   ^{:key pt}
   [:div.cell
-   {:class           (if (:revealed c) "revealed" "concealed")
-    :on-click        #(reveal-cell [pt c])
-    :on-context-menu (prevent-default #(toggle-flag-cell [pt c]))
+   {:class           (if (revealed pt) "revealed" "concealed")
+    :on-click        #(reveal-cell pt)
+    :on-context-menu (prevent-default #(toggle-flag-cell pt))
     :on-mouse-over   (mouse-over pt)}
-   (if (or (:revealed c) (:flagged c)) (cell-content c))])
+   (if (or (revealed pt) (flagged pt)) (cell-content state pt))])
 
-(defn grid-row [[[row-num _] :as cells]]
+(defn grid-row [state [[row-num _] :as cells]]
   ^{:key row-num}
-  [:div.row (map grid-cell cells)])
+  [:div.row (map #(grid-cell state %) cells)])
 
 (defn endgame-overlay []
   ;; TODO: this will be called on each render, should be an event
   (stop-timer)
-  [:div.overlay [:span (if (game/win? @grid) "🥳" "😭")]])
+  [:div.overlay [:span (if (game/win? @state) "🥳" "😭")]])
 
-(defn grid-ui [grid]
-  (let [rows (partition-all (game/width grid) grid)]
+(defn grid-ui [{:keys [width height] :as state}]
+  (let [pos (game/positions width height)
+        rows (partition-all width pos)]
     [:div.grid
      {:on-mouse-leave mouse-leave}
-     (map grid-row rows)
-     (when-not (game/active? grid) [endgame-overlay])
+     (map #(grid-row state %) rows)
+     ;; TODO: use game's state
+     (when (or (game/win? state) (game/lose? state)) [endgame-overlay])
      ]))
 
 (defn timer []
@@ -118,7 +122,7 @@
     "Reset"]])
 
 (defn bombs-remaining []
-  [:div.bombs-remaining (str "💣" (game/flags-remaining @grid))])
+  [:div.bombs-remaining (str "💣" (game/flags-remaining @state))])
 
 (defn game-stats []
   [:div.game-stats
@@ -128,7 +132,7 @@
 (defn minesweeper []
   [:div.game
    [game-stats]
-   [grid-ui @grid]
+   [grid-ui @state]
    [controls]])
 
 (defn ^:after-load run []
