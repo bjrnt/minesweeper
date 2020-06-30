@@ -5,9 +5,9 @@
   (if (contains? coll e) (disj coll e) (conj coll e)))
 
 (defn positions [width height]
-  (apply sorted-set (for [row (range width)
-             col (range height)]
-         [row col])))
+  (apply sorted-set (for [row (range height)
+                          col (range width)]
+                      [row col])))
 
 (defn new-bombs [grid bomb-count]
   (set (take bomb-count (shuffle grid))))
@@ -31,13 +31,14 @@
   (let [grid (positions width height)
         bombs (new-bombs grid bomb-count)
         counts (new-counts grid bombs)]
-    {:width    width
-     :height   height
-     :state    :active
-     :bombs    bombs
-     :flagged  #{}
-     :revealed #{}
-     :counts   counts}))
+    {:width      width
+     :height     height
+     :state      :active
+     :bombs      bombs
+     :flagged    #{}
+     :revealed   #{}
+     :counts     counts
+     :start-time (js/Date.)}))
 
 (defn win? [{:keys [revealed bombs flagged width height]}]
   (let [total-count (* width height)
@@ -49,10 +50,13 @@
   (boolean (some revealed bombs)))
 
 (defn update-state [game]
-  (assoc-in game [:state] (cond
-                            (win? game) :win
-                            (lose? game) :lose
-                            :else :active)))
+  (let [state' (cond
+                 (win? game) :win
+                 (lose? game) :lose
+                 :else :active)]
+    (merge game
+           {:state state'}
+           (when (not= state' :active) {:end-time (js/Date.)}))))
 
 (defn flags-remaining [{:keys [flagged bombs]}]
   (- (count bombs) (count flagged)))
@@ -62,18 +66,23 @@
     game
     (update-state (update-in game [:flagged] toggle pos))))
 
+(defn reveal-tile [game pos]
+  (-> game
+      (update-in [:revealed] conj pos)
+      (update-in [:flagged] disj pos)))
+
 (defn reveal-from [{:keys [revealed counts bombs] :as game} pos]
   (let [neighbors (neighbors (keys counts) pos)
-        game' (update-in game [:revealed] conj pos)]
+        game' (reveal-tile game pos)]
     (if (and (> (get counts pos) 0) (not (bombs pos)))
       game'
       (reduce reveal-from game' (filter #(not (revealed %)) neighbors)))))
 
-(defn reveal [{:keys [revealed flagged counts] :as game} pos]
+(defn reveal [{:keys [revealed flagged counts bombs] :as game} pos]
   (if (or (revealed pos) (flagged pos))
     game
-    (update-state (let [game' (update-in game [:revealed] conj pos)]
-                    (if-not (zero? (get counts pos))
+    (update-state (let [game' (reveal-tile game pos)]
+                    (if-not (and (zero? (get counts pos)) (not (bombs pos)))
                       game'
                       (reveal-from game' pos))))))
 

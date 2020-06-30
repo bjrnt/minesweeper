@@ -13,11 +13,16 @@
                    7 "rgb(0,0,0)"
                    8 "rgb(128,128,128)"})
 
-(def difficulties {:test         '(5 5 2)
+(def difficulties {
+                   ;:test         '(5 5 2)
                    :beginner     '(9 9 10)
                    :intermediate '(16 16 40)
                    :expert       '(30 16 99)})
-(def default-difficulty :test)
+
+(def default-difficulty
+  ;:test
+  :beginner
+  )
 
 (defonce selected-difficulty (r/atom default-difficulty))
 
@@ -25,11 +30,6 @@
 
 (defonce state (r/atom (apply game/new-game (default-difficulty difficulties))))
 
-;; TODO: move into game state
-(defonce playtime (r/atom 0))
-(defonce timer-token (r/atom (js/setInterval #(swap! playtime inc) 1000)))
-
-;; TODO: refactor
 (defn cell-content [{:keys [flagged bombs counts]} pt]
   (cond
     (flagged pt) "\uD83D\uDEA9"
@@ -47,16 +47,7 @@
 (defn toggle-flag-cell [pt]
   (swap! state game/take-action :flag pt))
 
-(defn reset-timer []
-  (js/clearInterval @timer-token)
-  (reset! timer-token (js/setInterval #(swap! playtime inc) 1000))
-  (reset! playtime 0))
-
-(defn stop-timer []
-  (when (some? @timer-token) (js/clearInterval @timer-token)))
-
 (defn reset-game []
-  (reset-timer)
   (reset! state (apply game/new-game (@selected-difficulty difficulties))))
 
 (defn context-action []
@@ -67,9 +58,9 @@
   (fn [e] (when (= space-keycode (.-keyCode e)) (do (.preventDefault e) (f)))))
 
 (defn mouse-over [pt]
-  (fn [] (reset! selected-cell pt)))
+  (fn [] (println pt) (reset! selected-cell pt)))
 
-(defn mouse-leave [e]
+(defn mouse-leave [_]
   (reset! selected-cell nil))
 
 (defn grid-cell [{:keys [revealed flagged] :as state} pt]
@@ -85,23 +76,43 @@
   ^{:key row-num}
   [:div.row (map #(grid-cell state %) cells)])
 
-(defn endgame-overlay []
-  ;; TODO: this will be called on each render, should be an event
-  (stop-timer)
-  [:div.overlay [:span (if (game/win? @state) "🥳" "😭")]])
+(defn endgame-overlay [state]
+  (when (not= :active state)
+    [:div.overlay
+     [:span (case state
+              :win "🥳"
+              :lose "😭")]]))
 
-(defn grid-ui [{:keys [width height] :as state}]
+(defn board [{:keys [width height state] :as game}]
   (let [pos (game/positions width height)
         rows (partition-all width pos)]
     [:div.grid
      {:on-mouse-leave mouse-leave}
-     (map #(grid-row state %) rows)
-     ;; TODO: use game's state
-     (when (or (game/win? state) (game/lose? state)) [endgame-overlay])
+     (map #(grid-row game %) rows)
+     [endgame-overlay state]
      ]))
 
+;; TODO: figure out how to simplify this
 (defn timer []
-  [:div.timer (str "⏱" @playtime)])
+  (let [timer-handle (r/atom nil)
+        current-time (r/atom (js/Date.))]
+    (r/create-class
+      {:display-name
+       "timer"
+       :component-did-mount
+       (fn [_] (reset! timer-handle (js/setInterval #(reset! current-time (js/Date.)) 1000)))
+       :component-did-update
+       (fn [this old-argv]
+         (let [new-argv (rest (r/argv this))]
+           (when (not= (first new-argv) (second old-argv))
+             (println (first new-argv) (second old-argv))
+             (js/clearInterval @timer-handle)
+             (reset! timer-handle (js/setInterval #(reset! current-time (js/Date.)) 1000))
+             (reset! current-time (js/Date.)))))
+       :reagent-render
+       (fn [start-time end-time]
+         [:div.timer
+          (str "⏱" (int (/ (- (.getTime (or end-time @current-time)) (.getTime start-time)) 1000) ))])})))
 
 (defn difficulty-selector []
   [:select
@@ -111,8 +122,8 @@
           ^{:key difficulty}
           [:option
            {:value difficulty}
-           (str/capitalize (name difficulty))]
-          ) (keys difficulties))])
+           (str/capitalize (name difficulty))])
+        (keys difficulties))])
 
 (defn controls []
   [:div.controls
@@ -122,17 +133,17 @@
     "Reset"]])
 
 (defn bombs-remaining []
-  [:div.bombs-remaining (str "💣" (game/flags-remaining @state))])
+  [:div.bombs-remaining (str "💣" (max 0 (game/flags-remaining @state)))])
 
-(defn game-stats []
+(defn game-stats [state]
   [:div.game-stats
-   [timer]
+   [timer (:start-time state) (:end-time state)]
    [bombs-remaining]])
 
 (defn minesweeper []
   [:div.game
-   [game-stats]
-   [grid-ui @state]
+   [game-stats @state]
+   [board @state]
    [controls]])
 
 (defn ^:after-load run []
