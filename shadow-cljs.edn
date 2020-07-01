@@ -4,6 +4,7 @@
                   :asset-path "."
                   :target     :browser
                   :modules    {:main {:init-fn minesweeper.core/main!}}
-                  :devtools   {:after-load minesweeper.core/reload!}
+                  :devtools   {:after-load minesweeper.core/reload!
+                               :repl-init-ns minesweeper.core}
                   :release    {:output-dir "docs/"}
                   :dev        {:closure-defines {minesweeper.util/DEV true}}}}}

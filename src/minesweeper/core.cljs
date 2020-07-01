@@ -5,6 +5,8 @@
             [clojure.string :as str]
             [minesweeper.util :as util]))
 
+;; CONSTANTS
+
 (def count-colors {1 "rgb(0,0,254)"
                    2 "rgb(0,128,0)"
                    3 "rgb(254,0,0)"
@@ -15,13 +17,15 @@
                    8 "rgb(128,128,128)"})
 
 (defonce difficulties (merge
-                    {:beginner     '(9 9 10)
-                     :intermediate '(16 16 40)
-                     :expert       '(30 16 99)}
-                    (when util/DEV
-                      {:test '(5 5 2)})))
+                        {:beginner     '(9 9 10)
+                         :intermediate '(16 16 40)
+                         :expert       '(30 16 99)}
+                        (when util/DEV
+                          {:test '(5 5 2)})))
 
 (defonce default-difficulty (if util/DEV :test :beginner))
+
+;; STATE
 
 (defonce selected-difficulty (r/atom default-difficulty))
 
@@ -29,16 +33,7 @@
 
 (defonce state (r/atom (apply game/new-game (default-difficulty difficulties))))
 
-(defn cell-content [{:keys [flagged bombs counts]} pt]
-  (cond
-    (flagged pt) "\uD83D\uDEA9"
-    (bombs pt) "\uD83D\uDCA3"
-    (= (get counts pt) 0) " "
-    :else [:span {:style {:color (count-colors (get counts pt))}} (get counts pt)]))
-
-(defn prevent-default [f]
-  "Wraps `f` in a handler to prevent the default event action."
-  (fn [e] (do (.preventDefault e) (f e))))
+;; STATE MUTATORS
 
 (defn reveal-cell [pt]
   (swap! state game/take-action :reveal pt))
@@ -52,15 +47,38 @@
 (defn context-action []
   (when (some? @selected-cell) (swap! state game/take-action :context @selected-cell)))
 
-(def space-keycode 32)
-(defn when-space [f]
-  (fn [e] (when (= space-keycode (.-keyCode e)) (do (.preventDefault e) (f)))))
-
 (defn mouse-over [pt]
-  (fn [] (reset! selected-cell pt)))
+  (reset! selected-cell pt))
 
 (defn mouse-leave [_]
   (reset! selected-cell nil))
+
+;; EVENT HANDLERS
+
+(defn prevent-default [f]
+  "Wraps `f` in a handler to prevent the default event action."
+  (fn [event] (do (.preventDefault event) (f event))))
+
+(defn no-modifiers [event]
+  (not (or (.-shiftKey event) (.-metaKey event) (.-altKey event) (.-ctrlKey event))))
+
+(defn when-key [key-code f]
+  "Returns an event handler that executes `f` only if the event matches the given `key-code`, and no keyboard modifiers are present."
+  (fn [event]
+    (when (and (= key-code (.-keyCode event)) (no-modifiers event))
+      (.preventDefault event)
+      (f))))
+(def when-space (partial when-key 32))
+(def when-r (partial when-key 82))
+
+;; UI
+
+(defn cell-content [{:keys [flagged bombs counts]} pt]
+  (cond
+    (flagged pt) "\uD83D\uDEA9"
+    (bombs pt) "\uD83D\uDCA3"
+    (= (get counts pt) 0) " "
+    :else [:span {:style {:color (count-colors (get counts pt))}} (get counts pt)]))
 
 (defn grid-cell [{:keys [revealed flagged] :as state} pt]
   ^{:key pt}
@@ -68,10 +86,10 @@
    {:class           (if (revealed pt) "revealed" "concealed")
     :on-click        #(reveal-cell pt)
     :on-context-menu (prevent-default #(toggle-flag-cell pt))
-    :on-mouse-over   (mouse-over pt)}
+    :on-mouse-over   #(mouse-over pt)}
    (if (or (revealed pt) (flagged pt)) (cell-content state pt))])
 
-(defn grid-row [state [[row-num _] :as cells]]
+(defn board-row [state [[row-num _] :as cells]]
   ^{:key row-num}
   [:div.row (map #(grid-cell state %) cells)])
 
@@ -87,9 +105,8 @@
         rows (partition-all width pos)]
     [:div.grid
      {:on-mouse-leave mouse-leave}
-     (map #(grid-row game %) rows)
-     [endgame-overlay state]
-     ]))
+     (map #(board-row game %) rows)
+     [endgame-overlay state]]))
 
 ;; TODO: figure out how to simplify this
 (defn timer []
@@ -119,17 +136,13 @@
     :value     @selected-difficulty}
    (map (fn [difficulty]
           ^{:key difficulty}
-          [:option
-           {:value difficulty}
-           (str/capitalize (name difficulty))])
+          [:option {:value difficulty} (str/capitalize (name difficulty))])
         (keys difficulties))])
 
 (defn controls []
   [:div.controls
    [difficulty-selector]
-   [:button.reset
-    {:on-click reset-game}
-    "Reset"]])
+   [:button.reset {:on-click reset-game} "Reset"]])
 
 (defn bombs-remaining []
   [:div.bombs-remaining (str "💣" (max 0 (game/flags-remaining @state)))])
@@ -139,11 +152,22 @@
    [timer (:start-time state) (:end-time state)]
    [bombs-remaining]])
 
+(defn instructions []
+  [:ul.instructions
+   [:li [:strong "Click"] " on a covered square to reveal it."]
+   [:li [:strong "Right-click"] " on a covered square to flag/unflag it."]
+   [:li [:strong "Press space"] " while hovering over a cell to take a contextual action: flag/unflag covered squares, uncover all neighbors of a uncovered square as long as there are a sufficient number of flags around it."]
+   [:li [:strong "Press R"] " to reset the game."]])
+
 (defn minesweeper []
-  [:div.game
-   [game-stats @state]
-   [board @state]
-   [controls]])
+  [:div
+   [:div.game
+    [game-stats @state]
+    [board @state]
+    [controls]]
+   [instructions]])
+
+;; HOOKS
 
 (defn reload! []
   (reagent.dom/render [minesweeper] (js/document.getElementById "app")))
@@ -151,6 +175,7 @@
 (defn main! []
   (do
     (.addEventListener js/document "keydown" (when-space context-action))
+    (.addEventListener js/document "keydown" (when-r reset-game))
     (reload!)))
 
 ;; TODOs:
@@ -159,5 +184,5 @@
 ;; [OK] 3. Improve UI (bombs remaining, clock)
 ;; [OK] 4. Add space functionality
 ;; 5. Fix first-click bomb
-;; 6. Add distribution settings (dev/prod)
+;; [OK] 6. Add distribution settings (dev/prod)
 ;; 7. Improve design
