@@ -77,8 +77,8 @@
   (cond
     (flagged pt) "\uD83D\uDEA9"
     (bombs pt) "\uD83D\uDCA3"
-    (= (get counts pt) 0) " "
-    :else [:span {:style {:color (count-colors (get counts pt))}} (get counts pt)]))
+    (= (counts pt) 0) " "
+    :else [:span {:style {:color (count-colors (counts pt))}} (counts pt)]))
 
 (defn grid-cell [{:keys [revealed flagged] :as state} pt]
   ^{:key pt}
