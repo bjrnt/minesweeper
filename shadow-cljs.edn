@@ -6,5 +6,5 @@
                   :modules    {:main {:init-fn minesweeper.core/main!}}
                   :devtools   {:after-load minesweeper.core/reload!
                                :repl-init-ns minesweeper.core}
-                  :release    {:output-dir "docs/"}
+                  :release    {:output-dir "docs/js/"}
                   :dev        {:closure-defines {minesweeper.util/DEV true}}}}}

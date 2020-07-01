@@ -1,6 +1,5 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  overflow:hidden;
 }
 
 .game {
@@ -61,3 +60,13 @@ body {
   background-color: #bbb;
   cursor: auto;
 }
+
+.instructions {
+    font-size: 1rem;
+    max-width: 25rem;
+}
+
+.instructions li + li {
+    margin-top: .25rem;
+}
+
