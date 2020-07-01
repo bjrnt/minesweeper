@@ -1,4 +1,4 @@
-(ns ^:figwheel-hooks minesweeper.core
+(ns minesweeper.core
   (:require [reagent.core :as r]
             [reagent.dom]
             [minesweeper.game :as game]
@@ -112,7 +112,7 @@
        :reagent-render
        (fn [start-time end-time]
          [:div.timer
-          (str "⏱" (int (/ (- (.getTime (or end-time @current-time)) (.getTime start-time)) 1000) ))])})))
+          (str "⏱" (int (/ (- (.getTime (or end-time @current-time)) (.getTime start-time)) 1000)))])})))
 
 (defn difficulty-selector []
   [:select
@@ -146,13 +146,13 @@
    [board @state]
    [controls]])
 
-(defn ^:after-load run []
+(defn reload! []
   (reagent.dom/render [minesweeper] (js/document.getElementById "app")))
 
-(defonce init-block
-         (do
-           (.addEventListener js/document "keydown" (when-space context-action))
-           (run)))
+(defn main! []
+  (do
+    (.addEventListener js/document "keydown" (when-space context-action))
+    (reload!)))
 
 ;; TODOs:
 ;; [OK] 1. Add proper game loop with win/lose

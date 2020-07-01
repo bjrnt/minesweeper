@@ -1,3 +1,0 @@
-^{:css-dirs ["resources/public/css"]}
-{:main minesweeper.core
- :output-to "docs/prod.js"}
