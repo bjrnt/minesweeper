@@ -2,7 +2,8 @@
   (:require [reagent.core :as r]
             [reagent.dom]
             [minesweeper.game :as game]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [minesweeper.util :as util]))
 
 (def count-colors {1 "rgb(0,0,254)"
                    2 "rgb(0,128,0)"
@@ -13,16 +14,14 @@
                    7 "rgb(0,0,0)"
                    8 "rgb(128,128,128)"})
 
-(def difficulties {
-                   ;:test         '(5 5 2)
-                   :beginner     '(9 9 10)
-                   :intermediate '(16 16 40)
-                   :expert       '(30 16 99)})
+(defonce difficulties (merge
+                    {:beginner     '(9 9 10)
+                     :intermediate '(16 16 40)
+                     :expert       '(30 16 99)}
+                    (when util/DEV
+                      {:test '(5 5 2)})))
 
-(def default-difficulty
-  ;:test
-  :beginner
-  )
+(defonce default-difficulty (if util/DEV :test :beginner))
 
 (defonce selected-difficulty (r/atom default-difficulty))
 
@@ -58,7 +57,7 @@
   (fn [e] (when (= space-keycode (.-keyCode e)) (do (.preventDefault e) (f)))))
 
 (defn mouse-over [pt]
-  (fn [] (println pt) (reset! selected-cell pt)))
+  (fn [] (reset! selected-cell pt)))
 
 (defn mouse-leave [_]
   (reset! selected-cell nil))
