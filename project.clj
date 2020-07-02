@@ -4,6 +4,7 @@
     {:dev
       {:dependencies [[org.clojure/clojurescript "1.10.773"]
                       [thheller/shadow-cljs "2.10.13"]
+                      [binaryage/oops "0.7.0"]
                       [reagent "1.0.0-alpha2"]]
        :resource-paths ["target"]
        :clean-targets ^{:protect false} ["target"]}})
