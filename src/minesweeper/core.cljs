@@ -9,15 +9,28 @@
 
 (def game (atom (game/new-game 5 5 1)))
 (defonce mouse (atom [0 0]))
+(defonce mouse-clicked (atom false))
+(defonce mouse-right-clicked (atom false))
+
+(defn prevent-default [f]
+  "Wraps `f` in a handler to prevent the default event action."
+  (fn [event] (do (.preventDefault event) (f event) false)))
+
+(defn click-mouse [event]
+  (case (oget event "button")
+    0 (reset! mouse-clicked true)
+    2 (reset! mouse-right-clicked true)))
 
 (defn to-rect [[y x]]
   (let [start-x (* square-size x)
         start-y (* square-size y)]
     (merge (canvas/->Rect [start-x start-y] [square-size square-size] [119 119 119 1.0])
-           {:stroke       square-stroke
-            :stroke-color [0 0 0 1.0]
-            :hover        true
-            :hover-color  [135 135 135 1.0]})))
+           {:stroke         square-stroke
+            :stroke-color   [0 0 0 1.0]
+            :hover          true
+            :hover-color    [135 135 135 1.0]
+            :on-click       #(println "Clicked:" x y)
+            :on-right-click #(println "Right-clicked:" x y)})))
 
 (defn squares [{:keys [width height] :as game}]
   (let [pos (game/positions width height)]
@@ -34,8 +47,19 @@
              (assoc-in obj [:hovered] false)
              (assoc-in obj [:hovered] (.isPointInPath (:ctx ctx) (canvas/hit-box obj) mX mY)))) objs)))
 
+(defn update-clicked [objs]
+  (when (or @mouse-clicked @mouse-right-clicked)
+    (let [[mX mY] (canvas/pt-in-canvas ctx @mouse)]
+      (doseq [obj objs]
+        (when (and (or (:on-right-click obj) (:on-click obj)) (satisfies? canvas/Hitable obj) (.isPointInPath (:ctx ctx) (canvas/hit-box obj) mX mY))
+          (when (and @mouse-clicked (:on-click obj)) ((:on-click obj)))
+          (when (and @mouse-right-clicked (:on-right-click obj)) ((:on-right-click obj))))))))
+
 (defn update! []
   (let [objs (concat (squares @game))]
+    (update-clicked objs)
+    (reset! mouse-clicked false)
+    (reset! mouse-right-clicked false)
     (-> objs
         (update-hover)
         (draw!))
@@ -48,7 +72,9 @@
   (.requestAnimationFrame js/window update!))
 
 (defn main! []
-  (.addEventListener js/document "mousemove" update-mouse)
+  (.addEventListener (:canvas ctx) "contextmenu" (prevent-default click-mouse))
+  (.addEventListener (:canvas ctx) "click" (prevent-default click-mouse))
+  (.addEventListener (:canvas ctx) "mousemove" (prevent-default update-mouse))
   (oset! (:ctx ctx) "font" "24px -apple-system")
   (.requestAnimationFrame js/window update!))
 
