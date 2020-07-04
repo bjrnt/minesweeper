@@ -19,7 +19,7 @@
 
 (defn set-defaults [ctx]
   (doto ctx
-    (oset! "textBaseline" "hanging")
+    (oset! "textBaseline" "top")
     (oset! "fillStyle" "black")))
 
 (defn canvas-context-from-id [id]
@@ -45,15 +45,14 @@
   (draw [this ctx] "Draw the object on the canvas."))
 
 (defprotocol Hitable
-  (hit-box [this] "Returns the Path2D hit box for this object."))
+  (hit-box [this] "Returns the Path2D hit box for the object."))
 
 (defn draw-scene [ctx objs]
-  (doseq [obj objs]
-    (if (seq? obj)
-      (draw-scene ctx obj)
-      (do
-        ;(println "Drawing:" obj)
-        (draw obj ctx)))))
+  (doseq [obj objs] (draw obj ctx)))
+
+(defn text-width [text ctx]
+  (let [rect (.measureText ctx (:text text))]
+    (.-width rect)))
 
 (defrecord Text [text pos color]
   Drawable

@@ -3,14 +3,36 @@
             [minesweeper.game :as game]
             [oops.core :refer [oget oset!]]))
 
-(defonce ctx (canvas/rescale! (canvas/canvas-context-from-id "canvas")))
-(def square-size 100)
-(def square-stroke 3)
+(def count-colors {1 [0 0 254 1.0]
+                   2 [0 128 0 1.0]
+                   3 [254 0 0 1.0]
+                   4 [0 0 128 1.0]
+                   5 [128 0 0 1.0]
+                   6 [0 128 128 1.0]
+                   7 [0 0 0 1.0]
+                   8 [128 128 128 1.0]})
 
-(def game (atom (game/new-game 5 5 1)))
+(defonce ctx (canvas/rescale! (canvas/canvas-context-from-id "canvas")))
+(def square-size 40)
+(def square-stroke 1)
+(def font-size 22)
+
+(defonce game-state (atom (game/new-game 5 5 5)))
 (defonce mouse (atom [0 0]))
 (defonce mouse-clicked (atom false))
 (defonce mouse-right-clicked (atom false))
+
+(defn reveal-cell [pt]
+  (swap! game-state game/take-action :reveal pt))
+
+;(defn toggle-flag-cell [pt]
+;  (swap! game-state game/take-action :flag pt))
+
+(defn context-action [pt]
+  (swap! game-state game/take-action :context pt))
+
+(defn condj [coll x]
+  (if x (conj coll x) coll))
 
 (defn prevent-default [f]
   "Wraps `f` in a handler to prevent the default event action."
@@ -21,20 +43,52 @@
     0 (reset! mouse-clicked true)
     2 (reset! mouse-right-clicked true)))
 
-(defn to-rect [[y x]]
-  (let [start-x (* square-size x)
-        start-y (* square-size y)]
-    (merge (canvas/->Rect [start-x start-y] [square-size square-size] [119 119 119 1.0])
-           {:stroke         square-stroke
-            :stroke-color   [0 0 0 1.0]
-            :hover          true
-            :hover-color    [135 135 135 1.0]
-            :on-click       #(println "Clicked:" x y)
-            :on-right-click #(println "Right-clicked:" x y)})))
+(defn text-for-cell [[x y]]
+  (let [bomb ((:bombs @game-state) [y x])
+        count ((:counts @game-state) [y x])
+        revealed ((:revealed @game-state) [y x])
+        flagged ((:flagged @game-state) [y x])]
+    (cond
+      flagged "\uD83D\uDEA9"
+      (not revealed) nil
+      bomb "💣"
+      (zero? count) " "
+      :else (str count))))
+
+(defn text-color-for-cell [[x y]]
+  (or (count-colors ((:counts @game-state) [y x]))
+      [0 0 0 1.0]))
+
+(defn cell-content [[x y] cell]
+  (when-let [txt (text-for-cell [x y])]
+    (let [[rx ry] (:pos cell)
+          text (canvas/->Text
+                 txt
+                 [(+ rx (/ square-size 2)) (+ ry (/ square-size 2))]
+                 (text-color-for-cell [x y]))]
+      (-> text
+          (update-in [:pos 0] #(- % (/ (canvas/text-width text (:ctx ctx)) 2)))
+          (update-in [:pos 1] #(+ % (/ font-size 2)))))))
+
+(defn cell [[x y]]
+  (let [revealed ((:revealed @game-state) [y x])
+        start-x (* square-size x)
+        start-y (* square-size y)
+        rect (merge (canvas/->Rect
+                      [start-x start-y]
+                      [square-size square-size]
+                      (if revealed [187 187 187 1.0] [119 119 119 1.0]))
+                    {:stroke         square-stroke
+                     :stroke-color   [0 0 0 1.0]
+                     :hover          true
+                     :hover-color    (if revealed [200 200 200 1.0] [131 131 131 1.0])
+                     :on-click       #(reveal-cell [y x])
+                     :on-right-click #(context-action [y x])})]
+    (condj [rect] (cell-content [x y] rect))))
 
 (defn squares [{:keys [width height] :as game}]
   (let [pos (game/positions width height)]
-    (map (partial to-rect) pos)))
+    (mapcat (partial cell) pos)))
 
 (defn draw! [objs]
   (canvas/clear ctx)
@@ -56,7 +110,7 @@
           (when (and @mouse-right-clicked (:on-right-click obj)) ((:on-right-click obj))))))))
 
 (defn update! []
-  (let [objs (concat (squares @game))]
+  (let [objs (concat (squares @game-state))]
     (update-clicked objs)
     (reset! mouse-clicked false)
     (reset! mouse-right-clicked false)
@@ -75,19 +129,12 @@
   (.addEventListener (:canvas ctx) "contextmenu" (prevent-default click-mouse))
   (.addEventListener (:canvas ctx) "click" (prevent-default click-mouse))
   (.addEventListener (:canvas ctx) "mousemove" (prevent-default update-mouse))
-  (oset! (:ctx ctx) "font" "24px -apple-system")
+  (oset! (:ctx ctx) "font" (str font-size "pt -apple-system"))
   (.requestAnimationFrame js/window update!))
 
 ;; CONSTANTS
 
-;(def count-colors {1 "rgb(0,0,254)"
-;                   2 "rgb(0,128,0)"
-;                   3 "rgb(254,0,0)"
-;                   4 "rgb(0,0,128)"
-;                   5 "rgb(128,0,0)"
-;                   6 "rgb(0,128,128)"
-;                   7 "rgb(0,0,0)"
-;                   8 "rgb(128,128,128)"})
+
 ;
 ;(defonce difficulties (merge
 ;                        {:beginner     '(9 9 10)
@@ -108,17 +155,11 @@
 ;
 ;;; STATE MUTATORS
 ;
-;(defn reveal-cell [pt]
-;  (swap! state game/take-action :reveal pt))
-;
-;(defn toggle-flag-cell [pt]
-;  (swap! state game/take-action :flag pt))
 ;
 ;(defn reset-game []
 ;  (reset! state (apply game/new-game (@selected-difficulty difficulties))))
 ;
-;(defn context-action []
-;  (when (some? @selected-cell) (swap! state game/take-action :context @selected-cell)))
+
 ;
 ;(defn mouse-over [pt]
 ;  (reset! selected-cell pt))
